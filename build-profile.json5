@@ -14,6 +14,16 @@
           }
         },
         "targetSdkVersion": "6.1.1(24)"
+      },
+      {
+        "name": "android",
+        "signingConfig": "default",
+        "compatibleSdkVersion": "5.0.0(12)",
+        "targetSdkVersion": "6.1.1(24)",
+        "runtimeOS": "OpenHarmony",
+        "output": {
+          "artifactName": "app"
+        }
       }
     ],
     "buildModeSet": [
@@ -33,7 +43,8 @@
         {
           "name": "default",
           "applyToProducts": [
-            "default"
+            "default",
+            "android"
           ]
         }
       ]
