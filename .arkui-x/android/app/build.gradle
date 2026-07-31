@@ -1,0 +1,137 @@
+plugins {
+    id 'com.android.application'
+}
+
+def arkuiXSdkDir = 'D:/ArkUI-X/Sdk/24/arkui-x'
+
+android {
+    compileSdkVersion 33
+    buildToolsVersion "30.0.3"
+
+    defaultConfig {
+        applicationId "com.example.myapplication"
+        minSdkVersion 26
+        targetSdkVersion 33
+        versionCode 1
+        versionName "0.0.1"
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    dynamicFeatures = []
+
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    applicationVariants.all { variant ->
+            variant.outputs.all { output ->
+                // 获取当前时间戳 (格式如: 20260731_1705)
+                def formattedDate = new Date().format("yyyyMMdd_HHmm")
+
+                // 获取应用名称 (或者直接写死你的 App 名字，如 "Chis")
+                def appName = "Chis"
+
+                // 拼装最终的 APK 文件名
+                outputFileName = "${appName}_v${variant.versionName}_${variant.buildType.name}_${formattedDate}.apk"
+            }
+    }
+
+    signingConfigs {
+            release {
+                storeFile file("my-release-key.jks") // jks 文件的路径（可放在 .arkui-x/android/app/ 目录下）
+                storePassword "Coder@612638"
+                keyAlias "my-alias"
+                keyPassword "Coder@612638"
+            }
+        }
+
+        buildTypes {
+            debug {
+                signingConfig signingConfigs.debug
+            }
+            release {
+                // 2. 绑定 release 签名
+                signingConfig signingConfigs.release
+
+                // 是否开启代码混淆/压缩（可选，生产环境建议开启）
+                minifyEnabled false
+                proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            }
+        }
+}
+
+repositories {
+    flatDir {
+        dirs 'libs', "${arkuiXSdkDir}/engine/libs/android"
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar', '*.aar'])
+
+    testImplementation 'junit:junit:4.+'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+}
+
+task syncArkUIXAssets {
+    // 注册为构建依赖
+    doLast {
+        // 1. 定位最新的 hap 文件
+        def hapDir = file("../../../entry/build/default/outputs/default")
+        def hapFiles = hapDir.listFiles({ dir, name -> name.endsWith('.hap') } as FilenameFilter)
+
+        if (hapFiles == null || hapFiles.length == 0) {
+            throw new GradleException("❌ 找不到 HAP 文件！请先在 DevEco Studio 中构建 HAP。")
+        }
+        def targetHap = hapFiles.max { it.lastModified() }
+
+        // 2. 清空并重新创建 assets 目录
+        def targetAssetsDir = file("src/main/assets/arkui-x/entry")
+        delete targetAssetsDir
+        targetAssetsDir.mkdirs()
+
+        // 3. 执行 HAP 包解压
+        copy {
+            from zipTree(targetHap)
+            into targetAssetsDir
+            rename 'module.json', 'module.json5'
+        }
+
+        // 4. 显式复制补齐缺少的 AppScope/app.json5
+        def appJsonFile = file("../../../AppScope/app.json5")
+        if (appJsonFile.exists()) {
+            copy {
+                from appJsonFile
+                into targetAssetsDir
+            }
+            println "=================================================="
+            println "✅ [Assets 同步成功] 已解压 ${targetHap.name} 并补齐 app.json5"
+            println "=================================================="
+        } else {
+            println "⚠️ 警告：未找到 AppScope/app.json5，请检查路径！"
+        }
+    }
+}
+
+// 确保在编译 Android 前自动执行同步
+preBuild.dependsOn syncArkUIXAssets
