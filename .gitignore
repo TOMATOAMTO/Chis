@@ -1,12 +1,116 @@
-/node_modules
-/oh_modules
-/local.properties
-/.idea
-**/build
-/.hvigor
-.cxx
-/.clangd
-/.clang-format
-/.clang-tidy
-**/.test
-/.appanalyzer
+﻿# ============================================
+# Mono-repo Root .gitignore
+# Chis - Cross-platform Application
+# ============================================
+
+# ============================================
+# Common
+# ============================================
+*.log
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+
+# ============================================
+# Android / Gradle / AGP
+# ============================================
+# Build outputs
+**/build/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Gradle
+**/.gradle/
+**/gradle-app.setting
+**/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Android Studio / IntelliJ
+**/.idea/
+*.iml
+*.iws
+*.ipr
+**/local.properties
+
+# Kotlin
+**/.kotlin/
+**/kotlin-stdlib*.jar
+
+# Signing
+**/keystore.properties
+**/*.jks
+**/*.keystore
+
+# Google Services
+**/google-services.json
+
+# NDK
+**/.cxx/
+**/obj/
+
+# ============================================
+# HarmonyOS / DevEco Studio / Hvigor / OHPM
+# ============================================
+# Build outputs
+**/oh_modules/
+**/node_modules/
+**/.preview/
+**/cache/
+**/outputs/
+**/report/
+**/.hvigor/
+**/hvigor/
+
+# DevEco Studio
+**/.deveco/
+**/.idea/
+
+# OHPM
+**/oh-package-lock.json5
+**/.ohpm/
+
+# Hvigor
+**/hvigor-config.json5
+**/hvigorfile.ts
+
+# Signing
+**/signature/
+
+# Local config
+**/local.properties
+
+# ============================================
+# ArkUI-X
+# ============================================
+**/.arkui-x/
+
+# ============================================
+# IDE Specific
+# ============================================
+# VS Code
+**/.vscode/
+
+# Eclipse
+**/.project
+**/.classpath
+**/.settings/
+
+# ============================================
+# OS Specific
+# ============================================
+# Windows
+*.lnk
+
+# Linux
+*~
+
+# macOS
+.AppleDouble
+.LSOverride

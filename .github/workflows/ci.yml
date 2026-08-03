@@ -1,0 +1,223 @@
+﻿# ============================================
+# Chis - Mono-repo CI/CD Pipeline
+# ============================================
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+# 允许取消正在进行的运行
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================
+  # 路径检测 Job
+  # ============================================
+  detect-changes:
+    name: 🔍 Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+      harmony: ${{ steps.filter.outputs.harmony }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect file changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            android:
+              - 'android/**'
+            harmony:
+              - 'harmony/**'
+
+  # ============================================
+  # Android 构建 Job
+  # ============================================
+  android-build:
+    name: 🤖 Android Build & Test
+    needs: detect-changes
+    if: needs.detect-changes.outputs.android == 'true' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x android/gradlew
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+
+      - name: Build Debug APK
+        working-directory: ./android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Run Unit Tests
+        working-directory: ./android
+        run: ./gradlew test --no-daemon
+
+      - name: Run Lint
+        working-directory: ./android
+        run: ./gradlew lint --no-daemon
+        continue-on-error: true
+
+      - name: Upload Android Build Artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-test-results
+          path: android/app/build/reports/tests/
+          retention-days: 7
+
+  # ============================================
+  # HarmonyOS 构建 Job
+  # ============================================
+  harmony-build:
+    name: 🔮 HarmonyOS Build & Test
+    needs: detect-changes
+    if: needs.detect-changes.outputs.harmony == 'true' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: harmony/package-lock.json
+
+      - name: Install OHPM
+        run: |
+          npm install -g @ohos/hvigor
+          npm install -g @ohos/hvigor-ohos-plugin
+
+      - name: Cache OHPM packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            harmony/oh_modules
+            harmony/node_modules
+            ~/.ohpm
+          key: ${{ runner.os }}-ohpm-${{ hashFiles('harmony/oh-package.json5', 'harmony/oh-package-lock.json5') }}
+          restore-keys: |
+            ${{ runner.os }}-ohpm-
+
+      - name: Install HarmonyOS dependencies
+        working-directory: ./harmony
+        run: ohpm install
+
+      - name: Build HarmonyOS HAP
+        working-directory: ./harmony
+        run: hvigor assembleHap --no-daemon
+
+      - name: Run Unit Tests
+        working-directory: ./harmony
+        run: hvigor test --no-daemon
+        continue-on-error: true
+
+      - name: Upload HarmonyOS Build Artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: harmony-hap
+          path: harmony/build/outputs/*.hap
+          retention-days: 7
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: harmony-test-results
+          path: harmony/build/reports/
+          retention-days: 7
+
+  # ============================================
+  # 代码质量检查 Job
+  # ============================================
+  code-quality:
+    name: 📊 Code Quality
+    needs: [ android-build, harmony-build ]
+    if: always() && (needs.android-build.result == 'success' || needs.harmony-build.result == 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run CodeQL Analysis (Android)
+        uses: github/codeql-action/init@v3
+        with:
+          languages: kotlin
+          queries: +security-and-quality
+        if: needs.android-build.result == 'success'
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        if: needs.android-build.result == 'success'
+
+  # ============================================
+  # 构建摘要 Job
+  # ============================================
+  build-summary:
+    name: 📋 Build Summary
+    needs: [ detect-changes, android-build, harmony-build, code-quality ]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "## 🚀 CI Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📁 Changed Paths" >> $GITHUB_STEP_SUMMARY
+          echo "- Android: ${{ needs.detect-changes.outputs.android }}" >> $GITHUB_STEP_SUMMARY
+          echo "- HarmonyOS: ${{ needs.detect-changes.outputs.harmony }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Android | ${{ needs.android-build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| HarmonyOS | ${{ needs.harmony-build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 Code Quality" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
