@@ -29,7 +29,9 @@ Desktop.ini
 # Gradle
 **/.gradle/
 **/gradle-app.setting
-**/gradle-wrapper.jar
+**/*.jar
+!**/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.jar
 
 # Android Studio / IntelliJ
@@ -114,3 +116,4 @@ Desktop.ini
 # macOS
 .AppleDouble
 .LSOverride
+
