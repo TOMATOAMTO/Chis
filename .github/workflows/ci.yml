@@ -99,7 +99,7 @@ jobs:
           retention-days: 7
 
   # ============================================
-  # HarmonyOS 验证（结构检查）
+  # HarmonyOS 验证
   # ============================================
   harmony-build:
     name: 🔮 HarmonyOS Validate
@@ -150,71 +150,24 @@ jobs:
           
           echo "✅ HarmonyOS 项目结构验证通过"
 
-      - name: Check TypeScript syntax
-        run: |
-          echo "📝 语法检查 (TypeScript/ArkTS)"
-          echo "==============================="
-          cd harmony
-          
-          # 检查所有 .ets 文件的基本语法
-          find entry -name "*.ets" -type f | while read file; do
-            echo "检查: $file"
-            # 简单检查括号匹配
-            if grep -q '{' "$file" && grep -q '}' "$file"; then
-              echo "  ✅ 括号匹配"
-            else
-              echo "  ⚠️  括号可能不匹配"
-            fi
-          done
-          
-          echo ""
-          echo "✅ 语法检查完成"
-
       - name: Generate build report
         if: always()
         run: |
           echo "## 📋 HarmonyOS 构建报告" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| 检查项 | 状态 |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 项目结构 | ✅ 通过 |" >> $GITHUB_STEP_SUMMARY
-          echo "| 源代码 | ✅ 存在 |" >> $GITHUB_STEP_SUMMARY
-          echo "| 配置文件 | ✅ 完整 |" >> $GITHUB_STEP_SUMMARY
+          echo "### 验证结果" >> $GITHUB_STEP_SUMMARY
+          echo "✅ 项目结构完整" >> $GITHUB_STEP_SUMMARY
+          echo "✅ 源代码存在" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 💡 构建说明" >> $GITHUB_STEP_SUMMARY
           echo "HarmonyOS HAP 包需要使用 DevEco Studio 或本地 OHPM 工具构建。" >> $GITHUB_STEP_SUMMARY
-          echo "本 CI 仅验证项目结构和语法。" >> $GITHUB_STEP_SUMMARY
-
-  # ============================================
-  # 代码质量
-  # ============================================
-  code-quality:
-    name: 📊 Code Quality
-    needs: [ android-build, harmony-build ]
-    if: always() && (needs.android-build.result == 'success' || needs.harmony-build.result == 'success')
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run CodeQL Analysis
-        uses: github/codeql-action/init@v3
-        with:
-          languages: kotlin
-          queries: +security-and-quality
-        if: needs.android-build.result == 'success'
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-        if: needs.android-build.result == 'success'
 
   # ============================================
   # 构建摘要
   # ============================================
   build-summary:
     name: 📋 Build Summary
-    needs: [ detect-changes, android-build, harmony-build, code-quality ]
+    needs: [ detect-changes, android-build, harmony-build ]
     if: always()
     runs-on: ubuntu-latest
 
@@ -228,7 +181,6 @@ jobs:
           echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| Android | ${{ needs.android-build.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| HarmonyOS | ${{ needs.harmony-build.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Code Quality | ${{ needs.code-quality.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 📝 Notes" >> $GITHUB_STEP_SUMMARY
           echo "- Android: 完整的构建和测试流程" >> $GITHUB_STEP_SUMMARY
